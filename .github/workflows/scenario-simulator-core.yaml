@@ -1,0 +1,67 @@
+name: Scenario Simulator Core
+
+on:
+  pull_request:
+    types: [labeled, opened, synchronize, reopened]
+  schedule:
+    - cron: '0 0 * * *' # Run nightly
+
+jobs:
+  run-scenarios:
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'run:scenario-simulator-core') || github.event_name == 'schedule' }}
+    runs-on: ['self-hosted', 'Linux', 'X64']
+    container:
+      image: ghcr.io/autowarefoundation/autoware:core-dependencies-humble
+    
+    steps:
+      - name: Checkout autoware_core
+        uses: actions/checkout@v4
+        with:
+          path: autoware_core
+
+      - name: Checkout scenario_simulator_core overlay
+        uses: actions/checkout@v4
+        with:
+          repository: TranHuuNhatHuy/scenario_simulator_core
+          path: scenario_simulator_core
+
+      - name: Setup Workspace
+        run: |
+          cd scenario_simulator_core
+          ./bootstrap.sh
+          # Re-link the checked out autoware_core to override the vcs imported one
+          rm -rf ws/src/autoware_core
+          ln -s $GITHUB_WORKSPACE/autoware_core ws/src/autoware_core
+
+      - name: Build Workspace
+        run: |
+          cd scenario_simulator_core
+          source /opt/ros/humble/setup.bash
+          # Using ccache for performance
+          export CC="ccache gcc"
+          export CXX="ccache g++"
+          colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF --packages-up-to \
+            autoware_core \
+            scenario_simulator_v2 \
+            autoware_core_message_bridge \
+            autoware_core_component_evaluator \
+            autoware_core_adapi_compat \
+            autoware_core_scenario_launch
+
+      - name: Run Scenarios
+        run: |
+          cd scenario_simulator_core
+          source setup_env.sh
+          source ws/install/setup.bash
+          export SCENARIO=core_smoke
+          ./run_scenario.sh
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scenario-test-results
+          path: |
+            /tmp/core_component_report.json
+            /tmp/result.junit.xml
+
