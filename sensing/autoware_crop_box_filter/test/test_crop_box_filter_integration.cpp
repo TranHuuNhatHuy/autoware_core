@@ -151,8 +151,6 @@ protected:
     transform_stamped.transform.rotation.z = 0.0;
     transform_stamped.transform.rotation.w = 1.0;
 
-    static_tf_broadcaster_->sendTransform(transform_stamped);
-
     // Create transform from base_link to output_frame
     geometry_msgs::msg::TransformStamped transform_stamped2;
     transform_stamped2.header.stamp = tf_publisher_node_->get_clock()->now();
@@ -166,7 +164,7 @@ protected:
     transform_stamped2.transform.rotation.z = 0.0;
     transform_stamped2.transform.rotation.w = 1.0;
 
-    static_tf_broadcaster_->sendTransform(transform_stamped2);
+    static_tf_broadcaster_->sendTransform({transform_stamped, transform_stamped2});
   }
 
   void setupCropBoxFilter()
